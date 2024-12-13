@@ -1,46 +1,88 @@
 import re
+import spacy
+print(spacy.__version__)
+
 
 def get_contact_info(doc):
-    """Extract contact details (email, phone number) from the resume."""
-    email = ""
-    phone = ""
-    
-    for ent in doc.ents:
-        if ent.label_ == "EMAIL":
-            email = ent.text
-        elif ent.label_ == "PHONE":
-            phone = ent.text
-    
-    return {"email": email, "phone": phone}
+    """Extract contact information like email and phone."""
+    contact_info = {"email": None, "phone": None}
+    email_regex = r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'
+    phone_regex = r'\+?\d{10,15}'
+
+    contact_info["email"] = re.search(email_regex, doc.text)
+    contact_info["phone"] = re.search(phone_regex, doc.text)
+
+    return contact_info
 
 def get_skills(doc):
-    """Extract skills from the resume using AI model or predefined list."""
-    skills = []
-    predefined_skills = ["python", "java", "c++", "html", "css", "javascript", "data analysis", "machine learning"]  # Add more skills
-    for ent in doc.ents:
-        if ent.label_ == "SKILL":  # Custom label for skills (or use predefined skills)
-            skills.append(ent.text.lower())
-    
-    # If no AI-based skills, use predefined list for matching
-    for skill in predefined_skills:
-        if skill.lower() in doc.text.lower():
-            skills.append(skill)
-    
-    return list(set(skills))
+    """Match predefined skills from the text."""
+    skills_set = {"python", "java", "html", "css", "javascript", "sql", "machine learning", "c++"}
+    skills = [skill for skill in skills_set if skill in doc.text.lower()]
+    return skills
 
 def get_experience(doc):
-    """Extract work experience (companies, positions, dates)"""
-    # You can implement this using a custom logic based on resume structure
+    """Extract work experience sections."""
     experience = []
-    for ent in doc.ents:
-        if ent.label_ == "ORG":  # Extract organization names
-            experience.append(ent.text)
+    for sent in doc.sents:
+        if "years of experience" in sent.text.lower():
+            experience.append(sent.text)
     return experience
 
 def get_education(doc):
-    """Extract education information from the resume."""
-    education = []
-    for ent in doc.ents:
-        if ent.label_ == "EDUCATION":  # Custom or based on keywords
-            education.append(ent.text)
+    """Extract education-related details."""
+    education_keywords = ["university", "college", "bachelor", "master", "phd", "diploma"]
+    education = [sent.text for sent in doc.sents if any(keyword in sent.text.lower() for keyword in education_keywords)]
     return education
+
+def get_gender(doc):
+    """Guess gender from explicit mentions or name."""
+    gender = "Not specified"
+    male_keywords = ["he", "him", "mr."]
+    female_keywords = ["she", "her", "ms.", "mrs."]
+
+    if any(word in doc.text.lower() for word in male_keywords):
+        gender = "Male"
+    elif any(word in doc.text.lower() for word in female_keywords):
+        gender = "Female"
+    
+    return gender
+
+def get_age(doc):
+    """Extract age or estimate based on years."""
+    for ent in doc.ents:
+        if ent.label_ == "DATE" and re.match(r'\d{4}', ent.text):
+            year = int(ent.text)
+            return 2024 - year
+    return "Not specified"
+
+def get_summary(doc):
+    """Extract the summary section of the resume."""
+    for sent in doc.sents:
+        if "summary" in sent.text.lower() or "objective" in sent.text.lower():
+            return sent.text
+    return "Not specified"
+
+def get_sector_name(doc):
+    """Extract industry sectors."""
+    sectors = ["IT", "Education", "Healthcare", "Marketing", "Finance"]
+    sector_names = [sector for sector in sectors if sector.lower() in doc.text.lower()]
+    return sector_names or ["Not specified"]
+
+def get_experience_level(doc):
+    """Infer experience level from text."""
+    levels = {"junior", "mid", "senior", "lead", "manager"}
+    experience_level = [level for level in levels if level in doc.text.lower()]
+    return experience_level or ["Not specified"]
+
+
+def get_qualification(doc):
+    """Extract qualifications from the text."""
+    qualifications_keywords = [
+        "bachelor's", "master's", "phd", "associate", "diploma",
+        "degree", "certification", "certified", "course", "training"
+    ]
+    qualifications = [
+        sent.text for sent in doc.sents
+        if any(keyword in sent.text.lower() for keyword in qualifications_keywords)
+    ]
+    return qualifications
